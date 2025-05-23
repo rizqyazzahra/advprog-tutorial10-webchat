@@ -9,6 +9,7 @@ use crate::{services::websocket::WebsocketService, User};
 pub enum Msg {
     HandleMsg(String),
     SubmitMessage,
+    ToggleDarkMode,
 }
 
 #[derive(Deserialize)]
@@ -45,6 +46,7 @@ pub struct Chat {
     wss: WebsocketService,
     messages: Vec<MessageData>,
     _producer: Box<dyn Bridge<EventBus>>,
+    dark_mode: bool,
 }
 
 impl Component for Chat {
@@ -79,6 +81,7 @@ impl Component for Chat {
             chat_input: NodeRef::default(),
             wss,
             _producer: EventBus::bridge(ctx.link().callback(Msg::HandleMsg)),
+            dark_mode: false,
         }
     }
 
@@ -134,19 +137,50 @@ impl Component for Chat {
                 };
                 false
             }
+            Msg::ToggleDarkMode => {
+                self.dark_mode = !self.dark_mode;
+                true
+            }
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let submit = ctx.link().callback(|_| Msg::SubmitMessage);
+        let toggle = ctx.link().callback(|_| Msg::ToggleDarkMode);
+        let root_class = if self.dark_mode {
+            "flex w-screen bg-gray-900 text-white"
+        } else {
+            "flex w-screen bg-white text-black"
+        };
+        let sidebar_class = if self.dark_mode {
+            "flex-none w-56 h-screen bg-gray-800"
+        } else {
+            "flex-none w-56 h-screen bg-gray-100"
+        };
+        let message_bg = if self.dark_mode {
+            "bg-gray-700"
+        } else {
+            "bg-gray-100"
+        };
+        let input_bg = if self.dark_mode {
+            "bg-gray-700 text-white"
+        } else {
+            "bg-gray-100 text-black"
+        };
+
         html! {
-            <div class="flex w-screen">
-                <div class="flex-none w-56 h-screen bg-gray-100">
-                    <div class="text-xl p-3">{"Users"}</div>
+            <div class={root_class}>
+                <div class={sidebar_class}>
+                    <div class="text-xl p-3 flex justify-between items-center">
+                        {"Users"}
+                        <button onclick={toggle} class="text-sm bg-gray-300 dark:bg-gray-700 p-1 rounded">
+                            { if self.dark_mode { "☀️" } else { "🌙" } }
+                        </button>
+                    </div>
                     {
                         self.users.clone().iter().map(|u| {
                             html!{
-                                <div class="flex m-3 bg-white rounded-lg p-2">
+                                <div class="flex m-3 bg-white dark:bg-gray-700 rounded-lg p-2">
                                     <div>
                                         <img class="w-12 h-12 rounded-full" src={u.avatar.clone()} alt="avatar"/>
                                     </div>
@@ -170,17 +204,19 @@ impl Component for Chat {
                             self.messages.iter().map(|m| {
                                 let user = self.users.iter().find(|u| u.name == m.from).unwrap();
                                 html!{
-                                    <div class="flex items-end w-3/6 bg-gray-100 m-8 rounded-tl-lg rounded-tr-lg rounded-br-lg ">
+                                    <div class={classes!("flex", "items-end", "w-3/6", message_bg, "m-8", "rounded-tl-lg", "rounded-tr-lg", "rounded-br-lg")}>
                                         <img class="w-8 h-8 rounded-full m-3" src={user.avatar.clone()} alt="avatar"/>
                                         <div class="p-3">
                                             <div class="text-sm">
                                                 {m.from.clone()}
                                             </div>
-                                            <div class="text-xs text-gray-500">
-                                                if m.message.ends_with(".gif") {
-                                                    <img class="mt-3" src={m.message.clone()}/>
-                                                } else {
-                                                    {m.message.clone()}
+                                            <div class="text-xs text-gray-400">
+                                                {
+                                                    if m.message.ends_with(".gif") {
+                                                        html! { <img class="mt-3" src={m.message.clone()} /> }
+                                                    } else {
+                                                        html! { {m.message.clone()} }
+                                                    }
                                                 }
                                             </div>
                                         </div>
@@ -191,10 +227,14 @@ impl Component for Chat {
 
                     </div>
                     <div class="w-full h-14 flex px-3 items-center">
-                        <input ref={self.chat_input.clone()} type="text" placeholder="Message" class="block w-full py-2 pl-4 mx-3 bg-gray-100 rounded-full outline-none focus:text-gray-700" name="message" required=true />
-                        <button onclick={submit} class="p-3 shadow-sm bg-blue-600 w-10 h-10 rounded-full flex justify-center items-center color-white">
-                            <svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="fill-white">
-                                <path d="M0 0h24v24H0z" fill="none"></path><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                        <input ref={self.chat_input.clone()} type="text" placeholder="Message" class={classes!("block", "w-full", "py-2", "pl-4", "mx-3", input_bg, "rounded-full", "outline-none")}
+                            name="message"
+                            required=true
+                        />
+                        <button onclick={submit} class="p-3 shadow-sm bg-blue-600 w-10 h-10 rounded-full flex justify-center items-center text-white">
+                            <svg fill="#ffffff" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="fill-white">
+                                <path d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
                             </svg>
                         </button>
                     </div>
